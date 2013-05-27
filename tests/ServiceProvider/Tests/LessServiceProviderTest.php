@@ -1,7 +1,7 @@
 <?php
 namespace ServiceProvider\Tests;
 
-use FF\ServiceProvider\LessServiceProvider;
+use DS\ServiceProvider\LessServiceProvider;
 
 class LessServiceProviderTest extends \PHPUnit_Framework_TestCase
 {
@@ -10,32 +10,34 @@ class LessServiceProviderTest extends \PHPUnit_Framework_TestCase
 
 		$sourceFile = __DIR__.'/Resources/less/style.less';
 		$targetFile = __DIR__.'/Resources/css/style.css';
+		$cacheFile = __DIR__.'/Resources/css/cache.css';
 
 		$fileExists = file_exists($targetFile);
 		$fileExists and unlink($targetFile);
 
-		$app = $this->getApp($sourceFile, $targetFile);
+		$app = $this->getApp($sourceFile, $targetFile, $cacheFile);
 		$app->boot();
 		$this->assertFileExists($targetFile);
 
 		$fileMTime = filesize($targetFile);
-		$app = $this->getApp($sourceFile, $targetFile);
+		$app = $this->getApp($sourceFile, $targetFile, $cacheFile);
 		$app->boot();
 		$this->assertEquals($fileMTime, filesize($targetFile));
 
 		$this->switchFiles();
-		$app = $this->getApp($sourceFile, $targetFile);
+		$app = $this->getApp($sourceFile, $targetFile, $cacheFile);
 		$app->boot();
 		$this->assertEquals($fileMTime, filesize($targetFile));
 
 	}
 
-	protected function getApp($sourceFile, $targetFile)
+	protected function getApp($sourceFile, $targetFile, $cacheFile)
 	{
 		$app = new \Silex\Application();
 		$app->register(new LessServiceProvider(), array(
-			'less.sources'     => array($sourceFile),
+			'less.source'     => array($sourceFile),
 			'less.target'      => $targetFile,
+			'less.cache'      => $cacheFile,
 			'less.target_mode' => 0775,
 		));
 		return $app;

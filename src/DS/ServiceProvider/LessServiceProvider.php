@@ -1,5 +1,5 @@
 <?php
-namespace FF\ServiceProvider;
+namespace DS\ServiceProvider;
 
 use Silex\Application;
 use Silex\ServiceProviderInterface;

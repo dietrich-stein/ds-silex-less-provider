@@ -41,7 +41,7 @@ You must specify three required parameters and one optional:
 <?php
 use DS\ServiceProvider\LessServiceProvider;
 
-// Register FF Silex Less service provider
+// Register DS Silex Less service provider
 $this->register(new LessServiceProvider(), array(
     'less.sources' => array(__DIR__.'/../../Resources/less/style.less'), // specify .less file
     'less.target' => __DIR__.'/../../web/css/style.css', // specify .css target file
