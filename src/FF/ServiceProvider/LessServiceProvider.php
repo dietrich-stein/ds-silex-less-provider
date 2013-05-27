@@ -14,7 +14,7 @@ class LessServiceProvider implements ServiceProviderInterface
 	 *
 	 * @var string
 	 */
-	const FORMATTER_CLASSIC    = 'classic';
+	const FORMATTER_CLASSIC = 'classic';
 
 	/**
 	 * Value for compressed CSS generated from LESS source files.
@@ -23,77 +23,52 @@ class LessServiceProvider implements ServiceProviderInterface
 	 */
 	const FORMATTER_COMPRESSED = 'compressed';
 
-	public function register(Application $app)
-	{
+	public function register(Application $app) {
 	}
 
-	public function boot(Application $app)
-	{
+	public function boot(Application $app) {
+
 		// Validate this params.
 		$this->validate($app);
 
 		// Define default formatter if not already set.
 		$formatter = isset($app['less.formatter']) ? $app['less.formatter'] : self::FORMATTER_CLASSIC;
-		$sources   = $app['less.sources'];
-		$target    = $app['less.target'];
+		$source = $app['less.source'];
+		$target = $app['less.target'];
+		$cache = $app['less.cache'];
 
-		$targetContent   = '';
-		$needToRecompile = false;
-		!is_array($sources) and $sources = array($sources);
+		// Attempt to load the ".cache" file.
+		if (file_exists($cache)) {
 
-		foreach ($sources as $source) {
-			if (!$needToRecompile) {
-				$needToRecompile = $this->targetNeedsRecompile($source, $target);
-			}
-			if ($needToRecompile) {
-				$handle = new \lessc($source);
-				$handle->setFormatter($formatter);
-				$targetContent .= $handle->parse();
-			}
+			// Store array contents for passing to cachedCompile()
+			$cacheContents = unserialize(file_get_contents($cache));
+
+		// If loading failed, we need to compile it
+		} else {
+
+			// Store source file for passing to cachedCompile()
+			$cacheContents = $source;
 		}
 
-		if (isset($handle)) {
-			if ($targetContent) {
-				file_put_contents($target, $targetContent);
-				if(isset($app['less.target_mode'])){
-					chmod($target, $app['less.target_mode']);
-				}
-			} else {
-				throw new \Exception("No content after parsing less source files. Please check your .less files");
+		$handle = new \lessc();
+		$handle->setFormatter($formatter);
+
+		// Use either array or ".less" file via cachedCompile
+		$newCache = $handle->cachedCompile($cacheContents);
+
+		if (!is_array($cacheContents) || $newCache["updated"] > $cacheContents["updated"]) {
+
+			// Write cache file
+			file_put_contents($cache, serialize($newCache));
+
+			// Write CSS file
+			file_put_contents($target, $newCache['compiled']);
+
+			// Change CSS permisions
+			if(isset($app['less.target_mode'])){
+				chmod($target, $app['less.target_mode']);
 			}
 		}
-	}
-
-	/**
-	 * Check if is required to recompile LESS file.
-	 *
-	 * @param string $source
-	 *   File to compile (if required)
-	 *
-	 * @param string $target
-	 *   Destination file for parsed LESS
-	 *
-	 * @return bool
-	 *   Indicate fi LESS file must be parsed
-	 */
-	private function targetNeedsRecompile($source, $target)
-	{
-		if (!file_exists($target)) {
-			return true;
-		}
-
-		$sourceDir   = dirname($source);
-		$targetMtime = filemtime($target);
-		foreach (new \DirectoryIterator($sourceDir) as $lessFile) {
-			/** @var $lessFile \DirectoryIterator */
-			if ($lessFile->isFile() && substr($lessFile->getFilename(), -5) === '.less') {
-				if ($lessFile->getMTime() > $targetMtime) {
-					return true;
-				}
-			}
-		}
-
-		return false;
 	}
 
 	/**
@@ -106,9 +81,10 @@ class LessServiceProvider implements ServiceProviderInterface
 	 *   If some params is not valid throw exception.
 	 */
 	private function validate(Application $app) {
+
 		// Params must be defined.
-		if (!isset($app['less.sources'], $app['less.target'])) {
-			throw new \Exception("Application['less.sources'] and ['less.target'] must be defined");
+		if (!isset($app['less.source'], $app['less.target'], $app['less.cache'])) {
+			throw new \Exception("Application['less.source'] and ['less.target'] must be defined");
 		}
 
 		// Destination directory must be writable.
@@ -117,18 +93,21 @@ class LessServiceProvider implements ServiceProviderInterface
 			throw new \Exception("Target file directory \"$targetDir\" is not writable");
 		}
 
+		// Cache directory must be writable.
+		$cacheDir = dirname($app['less.cache']);
+		if (!is_writable($cacheDir)) {
+			throw new \Exception("Cache file directory \"$cacheDir\" is not writable");
+		}
+
 		// Validate formatter type.
 		if (isset($app['less.formatter']) && !in_array($app['less.formatter'], array(self::FORMATTER_CLASSIC, self::FORMATTER_COMPRESSED))) {
 			throw new \Exception("Application['less.formatter'] can be 'classic' or 'compressed'");
 		}
 
-		// Validate source files.
-		$sources = $app['less.sources'];
-		!is_array($sources) and $sources = array($sources);
-		foreach ($sources as $source) {
-			if (!file_exists($source)) {
-				throw new \Exception('Could not find less source dir or file "'.$source.'"');
-			}
+		// Validate source file.
+		$source = $app['less.source'];
+		if (!file_exists($source)) {
+			throw new \Exception('Could not find less source file "'.$source.'"');
 		}
 	}
 }
