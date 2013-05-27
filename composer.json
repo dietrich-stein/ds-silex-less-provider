@@ -14,7 +14,7 @@
             "name": "Dietrich Stein",
             "email": "dietrich-stein@gmail.com",
             "role": "Developer"
-        },
+        }
     ],
     "require": {
         "php": ">=5.3.0",
